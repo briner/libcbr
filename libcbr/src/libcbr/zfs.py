@@ -18,6 +18,7 @@ import os
 #within pydinf
 import mix
 import mount as module_mount
+import path
 import notification 
 
 LOCK_MAX_WAIT=300  # seconds = 5 min
@@ -222,13 +223,14 @@ class Zfs(object):
     def cmp_by_mountpoint_from_lmount(self, a,b):
         a_m=a.get_mountpoint_from_lmount()
         b_m=b.get_mountpoint_from_lmount()
-        if not a_m:
-            return 1
-        if not b_m:
-            return -1
-        if (not a_m )and(not b_m ):
-            return 0
-        return mix.cmpAlphaNum(a_m, b_m)
+        return path.CPath.__cmp__(a_m, b_m)
+#        if not a_m:
+#            return 1
+#        if not b_m:
+#            return -1
+#        if (not a_m )and(not b_m ):
+#            return 0
+#        return mix.cmpAlphaNum(a_m, b_m)
     cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
     def cmp_by_name(cls, a,b):
         return mix.cmpAlphaNum(a.name, b.name)
