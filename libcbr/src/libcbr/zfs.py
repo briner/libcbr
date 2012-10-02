@@ -32,11 +32,12 @@ ZFSDESTROY_CMD="zfs destroy %s"
 ZFS_LIST_CMD_LPROP_VALUE=['name', 'origin', 'ch.unige:created_by', 'ch.unige:no_snapshots', 'zoned'
                          ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone"]
 ZFS_LIST_CMD="zfs list -H -o %s -t filesystem" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+ZFS_SET_CMD="zfs set %s=%s %s"
 #
 ZPOOL_LIST_CMD='zpool list -H -o name'
 #
 SNAPSHOT_LIST_CMD_LPROP_VALUE=['name', 'ch.unige:expiration_datetime', 'ch.unige:created_by', 'ch.unige:no_snapshots'
-                              ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone"]
+                              ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone", "ch.unige.dolly:do_not_keep"]
 SNAPSHOT_LIST_CMD="zfs list -H -o %s -t snapshot" % ','.join(SNAPSHOT_LIST_CMD_LPROP_VALUE)
 #
 KEEP_SNAPSHOT=False
@@ -58,6 +59,25 @@ if missing_snap:
 
 #
 # functions
+def set_prop_value(prop, value, name):
+    inst_cmd=ZFS_SET_CMD % (prop, value, name)
+    my_logger.debug('zfs set cmd(%s):' % inst_cmd)
+    proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
+    lstdout=proc.stdout.readlines()
+    lstderr=proc.stderr.readlines()
+    proc.communicate()
+    retcode=proc.wait()
+    if retcode != 0:
+        lmsg=['the cmd (%s) did not succeed' % inst_cmd]
+        for line in lstdout:
+            lmsg.append(' - stdout: %s' % line.rstrip())
+        for line in lstderr:
+            lmsg.append(' - stderr: %s' % line.rstrip())
+        notification.notify.add(lmsg)
+        for msg in lmsg:
+            my_logger.error(msg)
+        raise Exception( 'zfs set problem')
+    
 def destroy(name):
     inst_cmd=ZFSDESTROY_CMD % name
     my_logger.debug('zfs destroy cmd(%s):' % inst_cmd)
@@ -221,8 +241,8 @@ class Zfs(object):
         return [snapshot for snapshot in get_lsnapshot() if snapshot.zfs==self]
     lsnapshot=property(_get_lsnapshot)
     def cmp_by_mountpoint_from_lmount(self, a,b):
-        a_m=a.get_mountpoint_from_lmount()
-        b_m=b.get_mountpoint_from_lmount()
+        a_m=path.CPath( a.get_mountpoint_from_lmount() )
+        b_m=path.CPath( b.get_mountpoint_from_lmount() )
         return path.CPath.__cmp__(a_m, b_m)
 #        if not a_m:
 #            return 1
@@ -376,6 +396,15 @@ class ZfsList(list):
             return None
         zfs_holding_path=get_lzfs().by_name(mount_entry.device_to_mount)
         return zfs_holding_path
+    def under_path(self, under_path):
+        lmount=module_mount.get_lmount(under_path=under_path)
+        lzfs=[]
+        for mount in lmount:
+            zfs=get_lzfs().by_name(mount.device_to_mount)
+            if zfs:
+                lzfs.append(zfs)
+        return lzfs
+
 
 _lzfs=[]
 _do_populate_lzfs=True
