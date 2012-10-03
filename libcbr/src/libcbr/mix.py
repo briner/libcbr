@@ -30,9 +30,14 @@ def get_hostname():
 class UniqList(list):
     """UniqList is a list of object, which ensure the unicity of object.uniq in it
     this means that the object must have a uniq_value attribute"""
+    def __init__(self, *arg, **mydict):
+        self._luniq_name=[]
+        super(UniqList, self).__init__(*arg, **mydict)
     def append(self, newitem):
-        if [item for item in self if item.uniq_value == newitem.uniq_value]:
+        uniq_value=newitem.uniq_value
+        if uniq_value in self._luniq_name:
             raise Exception('can not append the item(%s) in self(%s), because the item(%s) is already in' %(newitem, self) )
+        self._luniq_name.append(uniq_value)
         super(UniqList, self).append(newitem)
 
 def isfifo(fn):
