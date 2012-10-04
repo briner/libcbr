@@ -60,6 +60,7 @@ if missing_snap:
 #
 # functions
 def set_prop_value(prop, value, name):
+    my_logger.debug('started zfs set_prop_value')
     inst_cmd=ZFS_SET_CMD % (prop, value, name)
     my_logger.debug('zfs set cmd(%s):' % inst_cmd)
     proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
@@ -77,8 +78,11 @@ def set_prop_value(prop, value, name):
         for msg in lmsg:
             my_logger.error(msg)
         raise Exception( 'zfs set problem')
+    my_logger.debug('ended zfs set_prop_value')
+
     
 def destroy(name):
+    my_logger.debug('started zfs destroy')
     inst_cmd=ZFSDESTROY_CMD % name
     my_logger.debug('zfs destroy cmd(%s):' % inst_cmd)
     proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
@@ -96,9 +100,12 @@ def destroy(name):
         for msg in lmsg:
             my_logger.error(msg)
         raise Exception( 'zfs destroy problem')
+        my_logger.debug('ended zfs destroy')
+
     
 
 def clone_zfs(snapshotname, new_zfsname, doption={}):
+    my_logger.debug('started zfs clone_zfs')
     zfs=get_lzfs().by_name(snapshotname.split("@")[0])
     fun_unlock=stackfunction.stack_function.add(
         zfs.zpool.unlock_it,                                                      
@@ -109,8 +116,8 @@ def clone_zfs(snapshotname, new_zfsname, doption={}):
     cmd_clone="/usr/sbin/zfs clone %s %s  %s" % (property_value_str
                                                    ,snapshotname, new_zfsname)
     #
+    my_logger.debug('zfs clone cmd(%s):' % cmd_clone)
     proc=subprocess.Popen(cmd_clone, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
-    my_logger.debug('zfs clone cmd:'+cmd_clone)
     lstdout=proc.stdout.readlines()
     lstderr=proc.stderr.readlines()
     proc.communicate()
@@ -127,6 +134,8 @@ def clone_zfs(snapshotname, new_zfsname, doption={}):
         raise Exception( 'clone_zfs')
     #
     fun_unlock()
+    my_logger.debug('ended zfs clone_zfs')
+
 
 ######################################
 #
@@ -162,7 +171,7 @@ class Zpool(object):
         my_logger.debug('"lock_zpool" zpool(%s) with file(%s)' % (self.name, zpool_lockname))
         if self.__class__.zpoolname_locked:
             if self.name==self.__class__.zpoolname_locked:
-                my_logger.debug('"lock_zpool" zpool(%s): was already done' % self.name)
+                my_logger.warning('"lock_zpool" zpool(%s): was already done' % self.name)
                 return
             else:
                 msg='can not lock more than 1 zpool, zpool_locked(%s), zpool_to_lock(%s)' % (self.zpoolname_locked, self.name)
@@ -195,11 +204,11 @@ class Zfs(object):
         self._origin=None
         self.duser_prop_value={}
         for prop, value in zip(ZFS_LIST_CMD_LPROP_VALUE, lvalue):
+            value=value if value != '-' else None
             if prop.find(':') != -1 :
-                self.duser_prop_value[prop]=value              
+                self.duser_prop_value[prop]=value
 #                self.user_property_2_indented_class(prop, value)
             else:
-                value=value if value != '-' else None
                 prop="_"+prop if prop in ['origin'] else prop
                 setattr(self,prop,value)
     @property
@@ -270,7 +279,6 @@ class Zfs(object):
         if retcode != 0:
             my_logger.error('the cmd (%s) did not succeed' % inst_cmd)
             raise Exception( 'zfsallsnap problem')      
-
 
 class Snapshot(object):
     def __init__(self, lvalue):
@@ -480,14 +488,14 @@ def populate_lzpool():
 #==============================================
 class Test(unittest.TestCase):
     def test_populate_zpool(self):
-        zpool=get_zpool_by_name('backup-test1_pool')
+        zpool=get_lzpool().by_name('backup-test1_pool')
         self.assertTrue(bool(zpool), 'get_zpool_ba_name ok')
     def test_populate_zfs(self):
-        zfs1=get_zfs_by_name('backup-test2_pool/backup-test2/usr')
-        zfs2=get_zfs_by_name('backup-test2_pool')
+        zfs1=get_lzfs().by_name('backup-test2_pool/backup-test2/usr')
+        zfs2=get_lzfs().by_name('backup-test2_pool')
         is_ok=bool(zfs1 and zfs2)
         self.assertTrue(is_ok, 'zfs ok')
     def test_get_zpool_from_zfs(self):
-        zfs=get_zfs_by_name('backup-test2_pool/backup-test2/home')
-        zpool=get_zpool_by_name('backup-test2_pool')
+        zfs=get_lzfs().by_name('backup-test2_pool/backup-test2/home')
+        zpool=get_lzpool().by_name('backup-test2_pool')
         self.assertTrue(zfs.zpool==zpool, 'can not find the corresponding zpool from a zfs ')

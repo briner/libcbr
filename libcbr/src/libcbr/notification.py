@@ -54,7 +54,8 @@ class NotifyError(object):
         # distribute messages to their recipient
         lrecipient=list( set(self.lemail_root).union(set(lrecipient)) )
         if not self.drecipient_msg:
-            stackfunction.stack_function.add(self.send_interrupted)
+            stackfunction.stack_function.add(self.send_interrupted
+                                            ,title="send_interrupted")
         for recipient in lrecipient:
             recipient=recipient.lower()
             for msg in msg_or_lmsg:

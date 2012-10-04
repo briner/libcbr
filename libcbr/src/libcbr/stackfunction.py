@@ -28,7 +28,7 @@ class FunctionContainer(object):
     def __str__(self):
         return 'fun(%d) %s(%s,%s)' %(self._index, self.fun.func_name, self.args, self.kw)
     def __call__(self):
-        my_logger.info('%s %s(%s, %s)' % (self.title, str(self.fun), str(self.args), str(self.kw)))
+        my_logger.info('[%d]%s %s(%s, %s)' % (self._index, self.title, str(self.fun), str(self.args), str(self.kw)))
         self.fun(*self.args, **self.kw)
         self.stackfunction.delete(self._index)
     def delete(self):
@@ -61,10 +61,15 @@ class StackFunction(object):
         my_logger.info('terminate group(%s)' % group)
         #
         #
-        self.lmap_index_fun.sort(self._mpi_cmp)
+        self.lmap_index_fun.sort(self._mpi_cmp)      
         lmap_index_fun=filter(lambda x: x[1].group==group, self.lmap_index_fun)
-        for map_index_fun in lmap_index_fun:
-            map_index_fun[1]()
+        lmap_index_fun.reverse()
+        if lmap_index_fun:
+            my_logger.info("what is going to be done")
+        for index, fun in lmap_index_fun:
+            my_logger.info(" - [%d]%s" % (index, fun.title))
+        for index, fun in lmap_index_fun:
+            fun()
         my_logger.info('terminate group(%s): done' % group)
     def terminate(self, signum, frame):
         # frame is not used in our code, but it required when doing a
