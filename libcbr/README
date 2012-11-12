@@ -1,0 +1,4 @@
+libcbr implements wrapper in python for:
+ zfs, mount & zone
+
+it does also implement partly the ISO8601

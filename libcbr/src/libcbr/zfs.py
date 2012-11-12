@@ -29,9 +29,9 @@ ZFSALLSNAP_CMD="/usr/local/bin/zfsallsnap snapshot -b -i -c %(zpoolname)s@%(snap
 ZFSREMOVEALLSNAP_CMD="/usr/local/bin/zfsallsnap destroy %(zpoolname)s@%(snapname)s"
 ZFSDESTROY_CMD="zfs destroy %s"
 #
-ZFS_LIST_CMD_LPROP_VALUE=['name', 'origin', 'ch.unige:created_by', 'ch.unige:no_snapshots', 'zoned'
+ZFS_LIST_CMD_LPROP_VALUE=['name', "type", 'origin', 'ch.unige:created_by', 'ch.unige:no_snapshots', 'zoned'
                          ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone"]
-ZFS_LIST_CMD="zfs list -H -o %s -t filesystem" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+ZFS_LIST_CMD="zfs list -H -o %s -t filesystem,volume" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
 ZFS_SET_CMD="zfs set %s=%s %s"
 #
 ZPOOL_LIST_CMD='zpool list -H -o name'
@@ -39,6 +39,10 @@ ZPOOL_LIST_CMD='zpool list -H -o name'
 SNAPSHOT_LIST_CMD_LPROP_VALUE=['name', 'ch.unige:expiration_datetime', 'ch.unige:created_by', 'ch.unige:no_snapshots'
                               ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone", "ch.unige.dolly:do_not_keep"]
 SNAPSHOT_LIST_CMD="zfs list -H -o %s -t snapshot" % ','.join(SNAPSHOT_LIST_CMD_LPROP_VALUE)
+#
+#VOLUME_LIST_CMD_LPROP_VALUE=["name", "ch.unige:created_by", 'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone",
+#                             "ch.unige.dolly:do_not_keep"]
+#VOLUME_LIST_CMD="zfs list -H -o %s -t volume" % ','.join(VOLUME_LIST_CMD_LPROP_VALUE)
 #
 KEEP_SNAPSHOT=False
 
@@ -143,7 +147,6 @@ def clone_zfs(snapshotname, new_zfsname, doption={}):
 #
 ######################################
 
-
 class Zpool(object):
     zpoolname_locked=''
     def __init__(self,  name):
@@ -161,11 +164,12 @@ class Zpool(object):
     @property
     def lzfs(self):
         if None != self._lzfs:
-            return self._lzfs
+            return self._lzfs[:]
         self._lzfs=[]
         for zfs in get_lzfs():
             if zfs.zpool == self:
                 self._lzfs.append(zfs)
+        return self._lzfs[:]
     def lock_it(self):
         zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name        
         my_logger.debug('"lock_zpool" zpool(%s) with file(%s)' % (self.name, zpool_lockname))
@@ -207,7 +211,6 @@ class Zfs(object):
             value=value if value != '-' else None
             if prop.find(':') != -1 :
                 self.duser_prop_value[prop]=value
-#                self.user_property_2_indented_class(prop, value)
             else:
                 prop="_"+prop if prop in ['origin'] else prop
                 setattr(self,prop,value)
@@ -232,7 +235,7 @@ class Zfs(object):
         zpoolname=self.name.split('/')[0]
         zpool=get_lzpool().by_name(zpoolname)
         if not zpool:
-            msg='zfs(%s) has not zpool attached ' %self.name
+            msg='zfs(%s) has not zpool attached' %self.name
             raise ZfsErrorIncoherent(msg)
         return zpool
     zpool=property(_get_zpool)
@@ -253,13 +256,6 @@ class Zfs(object):
         a_m=path.CPath( a.get_mountpoint_from_lmount() )
         b_m=path.CPath( b.get_mountpoint_from_lmount() )
         return path.CPath.__cmp__(a_m, b_m)
-#        if not a_m:
-#            return 1
-#        if not b_m:
-#            return -1
-#        if (not a_m )and(not b_m ):
-#            return 0
-#        return mix.cmpAlphaNum(a_m, b_m)
     cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
     def cmp_by_name(cls, a,b):
         return mix.cmpAlphaNum(a.name, b.name)
