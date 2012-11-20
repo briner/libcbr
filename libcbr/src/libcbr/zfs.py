@@ -29,16 +29,24 @@ ZFSALLSNAP_CMD="/usr/local/bin/zfsallsnap snapshot -b -i -c %(zpoolname)s@%(snap
 ZFSREMOVEALLSNAP_CMD="/usr/local/bin/zfsallsnap destroy %(zpoolname)s@%(snapname)s"
 ZFSDESTROY_CMD="zfs destroy %s"
 #
-ZFS_LIST_CMD_LPROP_VALUE=['name', "type", 'origin', 'ch.unige:created_by', 'ch.unige:no_snapshots', 'zoned'
-                         ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone"]
-ZFS_LIST_CMD="zfs list -H -o %s -t filesystem,volume" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
 ZFS_SET_CMD="zfs set %s=%s %s"
 #
 ZPOOL_LIST_CMD='zpool list -H -o name'
-#
-SNAPSHOT_LIST_CMD_LPROP_VALUE=['name', 'ch.unige:expiration_datetime', 'ch.unige:created_by', 'ch.unige:no_snapshots'
-                              ,'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone", "ch.unige.dolly:do_not_keep"]
-SNAPSHOT_LIST_CMD="zfs list -H -o %s -t snapshot" % ','.join(SNAPSHOT_LIST_CMD_LPROP_VALUE)
+
+ZFS_LIST_CMD_LPROP_VALUE=['name'
+                         ,'type'
+                         ,'origin'
+                         ,'zoned'
+                         ,'mountpoint'
+                         ,'mounted'
+                         ,'ch.unige:created_by'
+                         ,'ch.unige:no_snapshots'
+                         ,'ch.unige.dolly:mountpoint'
+                         ,'ch.unige.dolly:zone'
+                         ,'ch.unige:expiration_datetime'
+                         ,'ch.unige.dolly:do_not_keep']
+ZFS_LIST_CMD="zfs list -H -o %s -t all" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+
 #
 #VOLUME_LIST_CMD_LPROP_VALUE=["name", "ch.unige:created_by", 'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone",
 #                             "ch.unige.dolly:do_not_keep"]
@@ -56,60 +64,90 @@ KEEP_SNAPSHOT=False
 missing_zfs=[property for prop in ['name','origin'] if prop not in  ZFS_LIST_CMD_LPROP_VALUE]
 if missing_zfs:
     raise ValueError('ZFS_LIST_CMD_LPROP_VALUE must have these properties() included' % ','.join(missing_zfs))
-# insure that lprop_value sur zfs list does ask for 'name', 'origin' values
-missing_snap=[prop for prop in ['name'] if prop not in  SNAPSHOT_LIST_CMD_LPROP_VALUE]
-if missing_snap:
-    raise ValueError('ZNAPSHOT_LIST_CMD_LPROP_VALUE must have these properties() included' % ','.join(missing_snap))
+
+
+class ZfsError(Exception):pass
+class ZfsErrorIncoherent(ZfsError):
+    def __init__(self,msg):
+        global lzfs_dump
+        self.msg=msg
+        self.lzfs_dump=lzfs_dump[:]
+        my_logger.error("ZFS DUMP starting")
+        for line in self.lzfs_dump:
+            my_logger.error(line)
+        my_logger.error("ZFS DUMP ended")
+
+    def __str__(self):
+        return repr(self.msg)
+    def notify_it(self):
+        my_logger.error('the cmd (%s) in function(%s) did not succeed' % 
+                        (self.function_name, self.inst_cmd) )
+        for stdout_or_stdin, msg in self.lstdouterr:
+            my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
+
+
+class ZfsCmdError(ZfsError):
+    def __init__(self,function_name, inst_cmd, lstdouterr):
+        self.function_name=function_name
+        self.inst_cmd=inst_cmd
+        self.lstdouterr=lstdouterr
+    def __str__(self):
+        lret=["libcbr.zfs.%s with inst_cmd(%s)" % (self.function_name, self.inst_cmd)]
+        for stdouterr, msg in self.lstdouterr:
+            lret.append(' - %s : %s' % (stdouterr, msg))
+        return os.linesep.join(lret)
+    def notify_it(self):
+        my_logger.error('the cmd (%s) in function(%s) did not succeed' % 
+                        (self.function_name, self.inst_cmd) )
+        for stdout_or_stdin, msg in self.lstdouterr:
+            my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
 
 #
 # functions
 def set_prop_value(prop, value, name):
     my_logger.debug('started zfs set_prop_value')
     inst_cmd=ZFS_SET_CMD % (prop, value, name)
-    my_logger.debug('zfs set cmd(%s):' % inst_cmd)
+    my_logger.info('zfs set cmd(%s):' % inst_cmd)
     proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
     lstdout=proc.stdout.readlines()
     lstderr=proc.stderr.readlines()
     proc.communicate()
     retcode=proc.wait()
     if retcode != 0:
-        lmsg=['the cmd (%s) did not succeed' % inst_cmd]
+#        lmsg=['the cmd (%s) did not succeed' % inst_cmd]
+        lstdouterr=[]
         for line in lstdout:
-            lmsg.append(' - stdout: %s' % line.rstrip())
+            lstdouterr.append( ('stdout', line.rstrip()))
         for line in lstderr:
-            lmsg.append(' - stderr: %s' % line.rstrip())
-        notification.notify.add(lmsg)
-        for msg in lmsg:
-            my_logger.error(msg)
-        raise Exception( 'zfs set problem')
+            lstdouterr.append( ('stderr', line.rstrip()))
+        error=ZfsCmdError("set_prop_value", inst_cmd, lstdouterr)
+        error.notify_it()
+        raise error
     my_logger.debug('ended zfs set_prop_value')
 
     
 def destroy(name):
     my_logger.debug('started zfs destroy')
     inst_cmd=ZFSDESTROY_CMD % name
-    my_logger.debug('zfs destroy cmd(%s):' % inst_cmd)
+    my_logger.info('zfs destroy cmd(%s):' % inst_cmd)
     proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
     lstdout=proc.stdout.readlines()
     lstderr=proc.stderr.readlines()
     proc.communicate()
     retcode=proc.wait()
     if retcode != 0:
-        lmsg=['the cmd (%s) did not succeed' % inst_cmd]
+        lstdouterr=[]
         for line in lstdout:
-            lmsg.append(' - stdout: %s' % line.rstrip())
+            lstdouterr.append( ('stdout', line.rstrip()) )
         for line in lstderr:
-            lmsg.append(' - stderr: %s' % line.rstrip())
-        notification.notify.add(lmsg)
-        for msg in lmsg:
-            my_logger.error(msg)
-        raise Exception( 'zfs destroy problem')
-        my_logger.debug('ended zfs destroy')
-
-    
+            lstdouterr.append( ('stderr', line.rstrip()) )
+        error=ZfsCmdError("destroy", inst_cmd, lstdouterr)
+        error.notify_it()
+        raise error
+    my_logger.debug('ended zfs destroy')
 
 def clone_zfs(snapshotname, new_zfsname, doption={}):
-    my_logger.debug('started zfs clone_zfs')
+    my_logger.info('started zfs clone_zfs')
     zfs=get_lzfs().by_name(snapshotname.split("@")[0])
     fun_unlock=stackfunction.stack_function.add(
         zfs.zpool.unlock_it,                                                      
@@ -117,25 +155,24 @@ def clone_zfs(snapshotname, new_zfsname, doption={}):
     zfs.zpool.lock_it()
     #
     property_value_str=' '.join("-o %s=%s" % (p,v) for p,v in  doption.iteritems())
-    cmd_clone="/usr/sbin/zfs clone %s %s  %s" % (property_value_str
-                                                   ,snapshotname, new_zfsname)
+    inst_cmd="/usr/sbin/zfs clone %s %s  %s" % (property_value_str
+                                               ,snapshotname, new_zfsname)
     #
-    my_logger.debug('zfs clone cmd(%s):' % cmd_clone)
-    proc=subprocess.Popen(cmd_clone, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
+    my_logger.debug('zfs clone cmd(%s):' % inst_cmd)
+    proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
     lstdout=proc.stdout.readlines()
     lstderr=proc.stderr.readlines()
     proc.communicate()
     retcode=proc.wait()
     if retcode != 0:
-        lmsg=['the cmd (%s) did not succeed' % cmd_clone]
+        lstdouterr=[]
         for line in lstdout:
-            lmsg.append(' - stdout: %s' % line.rstrip())
+            lstdouterr.append( ('stdout', line.rstrip()) )
         for line in lstderr:
-            lmsg.append(' - stderr: %s' % line.rstrip())
-        notification.notify.add(lmsg)
-        for msg in lmsg:
-            my_logger.error(msg)
-        raise Exception( 'clone_zfs')
+            lstdouterr.append( ('stderr', line.rstrip()) )
+        error=ZfsCmdError("clone_zfs", inst_cmd, lstdouterr)
+        error.notify_it()
+        raise error
     #
     fun_unlock()
     my_logger.debug('ended zfs clone_zfs')
@@ -171,8 +208,8 @@ class Zpool(object):
                 self._lzfs.append(zfs)
         return self._lzfs[:]
     def lock_it(self):
-        zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name        
-        my_logger.debug('"lock_zpool" zpool(%s) with file(%s)' % (self.name, zpool_lockname))
+        zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name
+        my_logger.debug('started lock_zpool zpool(%s) with file(%s)' % (self.name, zpool_lockname))
         if self.__class__.zpoolname_locked:
             if self.name==self.__class__.zpoolname_locked:
                 my_logger.warning('"lock_zpool" zpool(%s): was already done' % self.name)
@@ -187,21 +224,18 @@ class Zpool(object):
         if retcode != 0:
             my_logger.error('the cmd (%s) did not succeed' % inst_cmd)
             raise Exception( 'lock zpool(%s) failed' % self.name)
+        my_logger.info("lock(%s) taken for a zpool. We are in a alone" % zpool_lockname)
         self.__class__.zpoolname_locked=self.name
-        my_logger.debug('"lock_zpool" zpool(%s): done' % self.name)
+        my_logger.debug('ended lock_zpool zpool(%s): done' % self.name)
     def unlock_it(self):
-        zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name        
-        my_logger.debug('"unlock_zpool" zpool(%s) by removing file(%s)' % (self.__class__.zpoolname_locked, zpool_lockname))
-        os.remove(zpool_lockname)
-        my_logger.debug('"unlock_zpool" zpool(%s): done' % self.__class__.zpoolname_locked)
+        zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name
+        my_logger.debug('started unlock_zpool zpool(%s) by removing file(%s)' % (self.__class__.zpoolname_locked, zpool_lockname))
+        my_logger.info('releasing the lock(%s) on zpool. Hello everyone' % zpool_lockname)
+        if os.path.isfile(zpool_lockname):
+            os.remove(zpool_lockname)
+        my_logger.debug('ended unlock_zpool zpool(%s): done' % self.__class__.zpoolname_locked)
         self.__class__.zpoolname_locked=''
 
-class ZfsError(Exception):pass
-class ZfsErrorIncoherent(ZfsError):
-    def __init__(self,msg):
-        self.msg=msg
-    def __str__(self):
-        return repr(self.msg)
 
 class Zfs(object):
     def __init__(self, lvalue):
@@ -214,9 +248,29 @@ class Zfs(object):
             else:
                 prop="_"+prop if prop in ['origin'] else prop
                 setattr(self,prop,value)
+    def get_is_mounted(self):
+        if not self.mountpoint:
+            return False
+        if self.mountpoint == "legacy":
+            return False
+        if self.mounted != "yes":
+            return False
+        return True
+    def is_under_path(self, under_path):
+        if self.get_is_mounted():
+            under_path=os.path.normpath(under_path)
+            mountpoint=os.path.normpath(self.mountpoint)
+            if under_path==os.path.commonprefix([under_path,mountpoint]):
+                return True
+        return False
     @property
     def origin(self):
         if self._origin:
+            snapshot=get_lsnapshot().by_name(self._origin)
+            if not snapshot:
+                msg='can not found the origin snapshot object of zfs(%s), origin(%s)' %(self.name, self._origin)
+                print '  '+'\n  '.join([snap.name for snap in get_lsnapshot()])
+                raise ZfsErrorIncoherent(msg)
             return get_lsnapshot().by_name(self._origin)
         else:
             ret=None
@@ -239,12 +293,12 @@ class Zfs(object):
             raise ZfsErrorIncoherent(msg)
         return zpool
     zpool=property(_get_zpool)
-    def get_mountpoint_from_lmount(self):
-        mount_entry=module_mount.get_mount_by_device_to_mount(self.name)
-        if mount_entry:
-            return mount_entry.mountpoint
-        else:
-            return None
+#mountpoint#    def get_mountpoint_from_lmount(self):
+#mountpoint#        mount_entry=module_mount.get_mount_by_device_to_mount(self.name)
+#mountpoint#        if mount_entry:
+#mountpoint#            return mount_entry.mountpoint
+#mountpoint#        else:
+#mountpoint#            return None
     def unmount(self):
         msg='zfs umount zfs(%s)' % self.name
         my_logger.debug(msg)
@@ -252,11 +306,16 @@ class Zfs(object):
     def _get_lsnapshot(self):
         return [snapshot for snapshot in get_lsnapshot() if snapshot.zfs==self]
     lsnapshot=property(_get_lsnapshot)
-    def cmp_by_mountpoint_from_lmount(self, a,b):
-        a_m=path.CPath( a.get_mountpoint_from_lmount() )
-        b_m=path.CPath( b.get_mountpoint_from_lmount() )
+    @classmethod
+    def cmp_by_mountpoint(self, a,b):
+        a_m=path.CPath( a.mountpoint )
+        b_m=path.CPath( b.mountpoint )
         return path.CPath.__cmp__(a_m, b_m)
-    cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
+#mountpoint#    def cmp_by_mountpoint_from_lmount(self, a,b):
+#mountpoint#        a_m=path.CPath( a.get_mountpoint_from_lmount() )
+#mountpoint#        b_m=path.CPath( b.get_mountpoint_from_lmount() )
+#mountpoint#        return path.CPath.__cmp__(a_m, b_m)
+#mountpoint#    cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
     def cmp_by_name(cls, a,b):
         return mix.cmpAlphaNum(a.name, b.name)
     cmp_by_name=classmethod(cmp_by_name)
@@ -281,10 +340,9 @@ class Snapshot(object):
         self._zfsname=None
         self._snapname=None
         self.duser_prop_value={}
-        for prop, value in zip(SNAPSHOT_LIST_CMD_LPROP_VALUE, lvalue):
+        for prop, value in zip(ZFS_LIST_CMD_LPROP_VALUE, lvalue):
             if prop.find(':') != -1 :
                 self.duser_prop_value[prop]=value          
-#                self.user_property_2_indented_class(prop, value)
             else:
                 value=value if value != '-' else None
                 prop="_"+prop if prop in ['name'] else prop
@@ -335,7 +393,7 @@ class Snapshot(object):
 
 ######################################
 #
-#          S N A P S H O T
+#           Z F S
 #
 ######################################
 
@@ -345,47 +403,16 @@ class SnapshotList(list):
         return lret[0] if lret else None
     def by_snapname(self, snapname):
         lret=SnapshotList([snap for snap in self if snap.snapname==snapname ])
-        return lret if lret else None
+        return lret
     def by_zfsname(self, zfsname):
         lret=SnapshotList([snap for snap in self if snap.zfsname==zfsname ])
-        return lret if lret else None
+        return lret
     def by_zfs(self, zfs):
         lret=SnapshotList([snap for snap in self if snap.zfsname==zfs.name ])
-        return lret if lret else None
-
-_lsnapshot=[]
-_do_populate_lsnapshot=True
-def get_lsnapshot():
-    #        
-    if _do_populate_lsnapshot==True:
-        populate_lsnapshot()
-    lret=SnapshotList(_lsnapshot[:])
-    return lret
-
-def populate_lsnapshot():
-    my_logger.debug('refresh zfs.populate_lsnapshot')
-    global _lsnapshot
-    global _do_populate_lsnapshot
-    #
-    cmd=SNAPSHOT_LIST_CMD
-    proc=subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, cwd='/')
-    lout=proc.stdout.readlines()
-    retcode=proc.wait()
-    if retcode != 0 :
-        my_logger.error('the cmd (%s) did not succeed' % cmd)
-    lout=[out.rstrip() for out in lout]
-    #
-    _lsnapshot=mix.UniqList()
-    for out in lout:
-        snap=Snapshot(out.rstrip().split('\t'))
-        _lsnapshot.append(snap)
-    _do_populate_lsnapshot=False
-
-######################################
-#
-#              Z F S
-#
-######################################
+        return lret
+    def by_zpool(self, zpool):
+        lret=SnapshotList([snap for snap in self if snap.zfs.zpool.name==zpool.name ])
+        return lret
 
 class ZfsList(list):
     def by_name(self, name):
@@ -401,17 +428,24 @@ class ZfsList(list):
         zfs_holding_path=get_lzfs().by_name(mount_entry.device_to_mount)
         return zfs_holding_path
     def under_path(self, under_path):
-        lmount=module_mount.get_lmount(under_path=under_path)
-        lzfs=[]
-        for mount in lmount:
-            zfs=get_lzfs().by_name(mount.device_to_mount)
-            if zfs:
-                lzfs.append(zfs)
-        return lzfs
+        lret=SnapshotList([zfs for zfs in self if zfs.is_under_path(under_path)])
+        return lret
 
 
 _lzfs=[]
+_lsnapshot=[]
 _do_populate_lzfs=True
+
+def refresh_lzfs():
+    global _do_populate_lzfs
+    _do_populate_lzfs=True
+
+def get_lsnapshot():
+    #        
+    if _do_populate_lzfs==True:
+        populate_lzfs()
+    lret=SnapshotList(_lsnapshot[:])
+    return lret
 def get_lzfs():
     #
     if _do_populate_lzfs:
@@ -419,25 +453,34 @@ def get_lzfs():
     lret=ZfsList(_lzfs[:])
     return lret
 
-def refresh_lzfs():
-    global _do_populate_lzfs
-    _do_populate_lzfs=True
-    
+lzfs_dump=[]
 def populate_lzfs():
     my_logger.debug('refresh zfs.populate_lzfs')
+    global _lsnapshot
     global _lzfs
     global _do_populate_lzfs
+    global lzfs_dump
     cmd=ZFS_LIST_CMD
     proc=subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, cwd='/')
     lout=proc.stdout.readlines()
     retcode=proc.wait()
     _lzfs=mix.UniqList()
+    _lsnapshot=mix.UniqList()
     if retcode != 0 :
         my_logger.error('the cmd (%s) did not succeed' % cmd)
-    _lzfs=ZfsList()
+    lzfs_dump=lout[:]
     for out in lout:
-        zfs=Zfs(out.rstrip().split('\t') )
-        _lzfs.append(zfs)
+        lelem=out.rstrip().split('\t')
+        fs_or_snap_or_volume=lelem[ZFS_LIST_CMD_LPROP_VALUE.index('type')]
+        if fs_or_snap_or_volume in ['filesystem', 'volume']:
+            zfs=Zfs(out.rstrip().split('\t') )
+            _lzfs.append(zfs)
+        elif fs_or_snap_or_volume == 'snapshot':
+            snap=Snapshot(out.rstrip().split('\t'))
+            _lsnapshot.append(snap)
+        else:
+            raise ZfsErrorIncoherent("unknown type(%s) for out(%s)"
+                                     % (fs_or_snap_or_volume, out))
     _do_populate_lzfs=False
 
 ######################################

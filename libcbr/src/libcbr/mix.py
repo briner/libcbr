@@ -326,7 +326,7 @@ path_info=_inst_path_info.path_info
 def get_size_of_list(l):
     return map(lambda x:len(x), l)
 
-def ll_2_nicestr(ll):
+def ll_2_nicelist(ll):
     if list != type(ll):
         return 'this is not a list'
     if len(ll)==0:
@@ -345,19 +345,34 @@ def ll_2_nicestr(ll):
                 if refSizeList[j]< sizeList[j]:
                     refSizeList[j] = sizeList[j]
     outputFormatLine=u' '.join( map(lambda x:"%-"+unicode(x)+'s', refSizeList) )
-    output='\n'.join( outputFormatLine % tuple(l) for l in ll)
-    return output
-#    output=u''
-#    for l in ll:
-#        try:
-#            output+=outputFormatLine%tuple(l)+u'\n'
-#        except UnicodeDecodeError, qq:
-#            print str(type(output)), output
-#            print l
-#            print str(type (l[1])),  l[1]
-#            print str(type (ll[13][1][0])), ll[13][1][0]
-#            raise qq
-#    return output[:-1]
+    lret=[outputFormatLine % tuple(l) for l in ll]
+    return lret
+
+def ll_2_nicestr(ll):
+    l=ll_2_nicelist(ll)
+    return '\n'.join(l)
+
+#def ll_2_nicestr(ll):
+#    if list != type(ll):
+#        return 'this is not a list'
+#    if len(ll)==0:
+#        return ''
+#    for i in range(len(ll)):
+#        if list != type(ll[i]):
+#            return 'this list in not constitued of list'
+#        if 0 == i:
+#            refSizeList=get_size_of_list(ll[i])
+#            refLenList=len(ll[i])
+#        else:
+#            if refLenList != len(ll[i]):
+#                return 'error all the list should be the same lenght'
+#            sizeList=get_size_of_list(ll[i])
+#            for j in range(refLenList):
+#                if refSizeList[j]< sizeList[j]:
+#                    refSizeList[j] = sizeList[j]
+#    outputFormatLine=u' '.join( map(lambda x:"%-"+unicode(x)+'s', refSizeList) )
+#    output='\n'.join( outputFormatLine % tuple(l) for l in ll)
+#    return output
 
 def ld_2_nicestr(ldentry,lkey=None):
     if 0== len(ldentry):
