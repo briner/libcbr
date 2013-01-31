@@ -19,7 +19,6 @@ import os
 import mix
 import mount as module_mount
 import path
-import notification 
 
 LOCK_MAX_WAIT=300  # seconds = 5 min
 LOCK_TIMEOUT=86400 # seconds = 24 hours
@@ -285,14 +284,14 @@ class Zfs(object):
     def __str__(self):
         return 'zfs(%s)' % (self.name)
     __repr__=__str__
-    def _get_zpool(self):
+    @property
+    def zpool(self):
         zpoolname=self.name.split('/')[0]
         zpool=get_lzpool().by_name(zpoolname)
         if not zpool:
             msg='zfs(%s) has not zpool attached' %self.name
             raise ZfsErrorIncoherent(msg)
         return zpool
-    zpool=property(_get_zpool)
 #mountpoint#    def get_mountpoint_from_lmount(self):
 #mountpoint#        mount_entry=module_mount.get_mount_by_device_to_mount(self.name)
 #mountpoint#        if mount_entry:
@@ -303,9 +302,9 @@ class Zfs(object):
         msg='zfs umount zfs(%s)' % self.name
         my_logger.debug(msg)
         module_mount.umount_device(self.name)
-    def _get_lsnapshot(self):
+    @property
+    def lsnapshot(self):
         return [snapshot for snapshot in get_lsnapshot() if snapshot.zfs==self]
-    lsnapshot=property(_get_lsnapshot)
     @classmethod
     def cmp_by_mountpoint(self, a,b):
         a_m=path.CPath( a.mountpoint )
@@ -316,9 +315,9 @@ class Zfs(object):
 #mountpoint#        b_m=path.CPath( b.get_mountpoint_from_lmount() )
 #mountpoint#        return path.CPath.__cmp__(a_m, b_m)
 #mountpoint#    cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
+    @classmethod
     def cmp_by_name(cls, a,b):
         return mix.cmpAlphaNum(a.name, b.name)
-    cmp_by_name=classmethod(cmp_by_name)
     def do_snapshot(self, snapname, isrecursive=False, doption={}):
         zfsname_at_snapname=self.name+"@"+snapname
         isrecursive_str= '-r' if isrecursive else ''
