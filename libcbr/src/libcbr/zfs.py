@@ -24,8 +24,8 @@ LOCK_MAX_WAIT=300  # seconds = 5 min
 LOCK_TIMEOUT=86400 # seconds = 24 hours
 
 ZFS_SNAPSHOT_CMD="zfs snapshot %(isrecursive)s %(property_value)s %(zfsname_at_snapname)s" 
-ZFSALLSNAP_CMD="/usr/local/bin/zfsallsnap snapshot -b -i -c %(zpoolname)s@%(snapname)s"
-ZFSREMOVEALLSNAP_CMD="/usr/local/bin/zfsallsnap destroy %(zpoolname)s@%(snapname)s"
+#ZFSALLSNAP_CMD="/usr/local/bin/zfsallsnap snapshot -b -i -c %(zpoolname)s@%(snapname)s"
+#ZFSREMOVEALLSNAP_CMD="/usr/local/bin/zfsallsnap destroy %(zpoolname)s@%(snapname)s"
 ZFSDESTROY_CMD="zfs destroy %s"
 #
 ZFS_SET_CMD="zfs set %s=%s %s"
@@ -38,12 +38,14 @@ ZFS_LIST_CMD_LPROP_VALUE=['name'
                          ,'zoned'
                          ,'mountpoint'
                          ,'mounted'
+                         ,'readonly'
                          ,'ch.unige:created_by'
                          ,'ch.unige:no_snapshots'
                          ,'ch.unige.dolly:mountpoint'
                          ,'ch.unige.dolly:zone'
                          ,'ch.unige:expiration_datetime'
-                         ,'ch.unige.dolly:do_not_keep']
+                         ,'ch.unige.dolly:do_not_keep'
+                         ,'ch.unige.dolly:unmount_datetime']
 ZFS_LIST_CMD="zfs list -H -o %s -t all" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
 
 #
@@ -103,9 +105,11 @@ class ZfsCmdError(ZfsError):
 
 #
 # functions
-def set_prop_value(prop, value, name):
-    my_logger.debug('started zfs set_prop_value')
-    inst_cmd=ZFS_SET_CMD % (prop, value, name)
+def set_prop_value(prop, value, zfsname):
+    if prop not in ZFS_LIST_CMD_LPROP_VALUE:
+        raise ValueError('prop(%s) must be included in ZFS_LIST_CMD_LPROP_VALUE' % prop)
+    my_logger.debug('started set_zfs_prop_value')
+    inst_cmd=ZFS_SET_CMD % (prop, value, zfsname)
     my_logger.info('zfs set cmd(%s):' % inst_cmd)
     proc=subprocess.Popen(inst_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
     lstdout=proc.stdout.readlines()
@@ -122,7 +126,7 @@ def set_prop_value(prop, value, name):
         error=ZfsCmdError("set_prop_value", inst_cmd, lstdouterr)
         error.notify_it()
         raise error
-    my_logger.debug('ended zfs set_prop_value')
+    my_logger.debug('ended set_zfs_prop_value')
 
     
 def destroy(name):
@@ -270,7 +274,7 @@ class Zfs(object):
                 msg='can not found the origin snapshot object of zfs(%s), origin(%s)' %(self.name, self._origin)
                 print '  '+'\n  '.join([snap.name for snap in get_lsnapshot()])
                 raise ZfsErrorIncoherent(msg)
-            return get_lsnapshot().by_name(self._origin)
+            return snapshot
         else:
             ret=None
         return ret
@@ -284,6 +288,8 @@ class Zfs(object):
     def __str__(self):
         return 'zfs(%s)' % (self.name)
     __repr__=__str__
+    def set_property(self, prop, value):
+        set_prop_value(prop, value, self.name)
     @property
     def zpool(self):
         zpoolname=self.name.split('/')[0]
@@ -292,12 +298,6 @@ class Zfs(object):
             msg='zfs(%s) has not zpool attached' %self.name
             raise ZfsErrorIncoherent(msg)
         return zpool
-#mountpoint#    def get_mountpoint_from_lmount(self):
-#mountpoint#        mount_entry=module_mount.get_mount_by_device_to_mount(self.name)
-#mountpoint#        if mount_entry:
-#mountpoint#            return mount_entry.mountpoint
-#mountpoint#        else:
-#mountpoint#            return None
     def unmount(self):
         msg='zfs umount zfs(%s)' % self.name
         my_logger.debug(msg)
@@ -310,11 +310,6 @@ class Zfs(object):
         a_m=path.CPath( a.mountpoint )
         b_m=path.CPath( b.mountpoint )
         return path.CPath.__cmp__(a_m, b_m)
-#mountpoint#    def cmp_by_mountpoint_from_lmount(self, a,b):
-#mountpoint#        a_m=path.CPath( a.get_mountpoint_from_lmount() )
-#mountpoint#        b_m=path.CPath( b.get_mountpoint_from_lmount() )
-#mountpoint#        return path.CPath.__cmp__(a_m, b_m)
-#mountpoint#    cmp_by_mountpoint_from_lmount=classmethod(cmp_by_mountpoint_from_lmount)
     @classmethod
     def cmp_by_name(cls, a,b):
         return mix.cmpAlphaNum(a.name, b.name)
