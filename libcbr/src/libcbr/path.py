@@ -1,6 +1,4 @@
 import mix
-import re
-import os
 
 class CPathError(Exception):
     '''Base class for exception for PATH'''
@@ -60,52 +58,6 @@ class CPath(str):
         return CPath(self)
 
 
-
-#def clean_it(path):
-#    if path[-2:]=="/.":
-#        path=path[:-2]
-##    if path[:2]=="./":
-##        path=path[2:]
-#    return path
-
-
-#def commonprefixdir(dir1, dir2):
-#   dir1=os.path.normpath(dir1)
-#   dir2=os.path.normpath(dir2)
-#   if len(dir1) > 2:
-#      if dir1[-1] == os.path.sep:
-#         dir1=dir1[:-1]
-#   if len(dir2) > 2:
-#      if dir2[-1] == os.path.sep:
-#         dir2=dir2[:-1]
-#   ldir1=dir1.split(os.path.sep)
-#   ldir2=dir2.split(os.path.sep)
-##   print 'ldir',  ldir1,  ldir2
-#   cmn_dir=[]
-#   if len(ldir1) > len(ldir2):
-#      min_length=len(ldir2)
-#   else:
-#      min_length=len(ldir1)
-##  print 'min_length',  min_length
-#   for i in range(min_length):
-#      if ldir1[i] == ldir2[i]:
-#         cmn_dir.append(ldir1[i])
-#      else:
-#         break
-##   print 'cmn_dir',  cmn_dir
-#   if len(cmn_dir) ==1:
-#      if cmn_dir[0] == '':
-#         return os.path.sep
-#   return os.path.sep.join(cmn_dir)
-
-#def pathsplit(dir):
-#   dir=os.path.normpath(dir)
-#   ldir=[]
-#   tmp=dir
-#   while tmp != os.path.split(tmp)[0]:
-#      tmp, elempath = os.path.split(tmp)
-#      ldir.insert(0, elempath)
-#   return ldir
 
 import unittest
 class CTestPath( unittest.TestCase ):

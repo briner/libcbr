@@ -30,7 +30,7 @@ class NotifyError(object):
         self.current_lcontext_msg=[]
     def add(self, msg_or_lmsg, lrecipient=[], l_or_context_msg=[]):
         #print '1   msg_or_lmsg', msg_or_lmsg, 'l_or_context_msg', l_or_context_msg
-        my_logger.debug('def NotifyError.add(msg_or_lmsg(%s), lrecipient(%s))' % (msg_or_lmsg, lrecipient)) # TODO:debug2
+        my_logger.debug('def NotifyError.add(msg_or_lmsg(%s), lrecipient(%s))' % (msg_or_lmsg, lrecipient))
         #
         if type(msg_or_lmsg) != list:
             msg_or_lmsg=[msg_or_lmsg]

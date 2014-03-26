@@ -47,6 +47,7 @@ ZFS_LIST_CMD_LPROP_VALUE=['name'
                          ,'ch.unige.dolly:do_not_keep'
                          ,'ch.unige.dolly:unmount_datetime']
 ZFS_LIST_CMD="zfs list -H -o %s -t all" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+ZFS_LIST_CMD_4_ZPOOL="zfs list -H -o %s -t all -r %%s" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
 
 #
 #VOLUME_LIST_CMD_LPROP_VALUE=["name", "ch.unige:created_by", 'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone",
@@ -86,6 +87,10 @@ class ZfsErrorIncoherent(ZfsError):
         for stdout_or_stdin, msg in self.lstdouterr:
             my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
 
+class ZfsUnableToLockZpool(ZfsError):
+    def __init__(self,zpoolname):
+        my_logger.error("unable to get the lock for zpool(%s)"%zpoolname)
+
 
 class ZfsCmdError(ZfsError):
     def __init__(self,function_name, inst_cmd, lstdouterr):
@@ -102,7 +107,6 @@ class ZfsCmdError(ZfsError):
                         (self.function_name, self.inst_cmd) )
         for stdout_or_stdin, msg in self.lstdouterr:
             my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
-
 #
 # functions
 def set_prop_value(prop, value, zfsname):
@@ -226,7 +230,7 @@ class Zpool(object):
         retcode=proc.wait()
         if retcode != 0:
             my_logger.error('the cmd (%s) did not succeed' % inst_cmd)
-            raise Exception( 'lock zpool(%s) failed' % self.name)
+            raise ZfsUnableToLockZpool(self.name)
         my_logger.info("lock(%s) taken for a zpool. We are in a alone" % zpool_lockname)
         self.__class__.zpoolname_locked=self.name
         my_logger.debug('ended lock_zpool zpool(%s): done' % self.name)
@@ -448,13 +452,16 @@ def get_lzfs():
     return lret
 
 lzfs_dump=[]
-def populate_lzfs():
+def populate_lzfs(for_zpool=None):
     my_logger.debug('refresh zfs.populate_lzfs')
     global _lsnapshot
     global _lzfs
     global _do_populate_lzfs
     global lzfs_dump
-    cmd=ZFS_LIST_CMD
+    if for_zpool:
+        cmd=ZFS_LIST_CMD_4_ZPOOL % for_zpool.name
+    else:
+        cmd=ZFS_LIST_CMD
     proc=subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, cwd='/')
     lout=proc.stdout.readlines()
     retcode=proc.wait()
