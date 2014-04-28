@@ -46,8 +46,8 @@ ZFS_LIST_CMD_LPROP_VALUE=['name'
                          ,'ch.unige:expiration_datetime'
                          ,'ch.unige.dolly:do_not_keep'
                          ,'ch.unige.dolly:unmount_datetime']
-ZFS_LIST_CMD="zfs list -H -o %s -t all" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
-ZFS_LIST_CMD_4_ZPOOL="zfs list -H -o %s -t all -r %%s" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+ZFS_LIST_CMD="zfs list -H -o %s -t filesystem,volume,snapshot" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
+ZFS_LIST_CMD_4_ZPOOL="zfs list -H -o %s -t filesystem,volume,snapshot -r %%s" % ','.join(ZFS_LIST_CMD_LPROP_VALUE)
 
 #
 #VOLUME_LIST_CMD_LPROP_VALUE=["name", "ch.unige:created_by", 'ch.unige.dolly:mountpoint', "ch.unige.dolly:zone",
