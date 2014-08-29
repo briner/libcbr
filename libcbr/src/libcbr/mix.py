@@ -19,6 +19,12 @@ DF_CMD='/usr/bin/df "%s"'
 DEBUG=False
 my_logger=logging.getLogger('MyLogger')
 
+def full_readlink(path):
+  if os.path.islink(path):
+    return full_readlink(os.readlink(path))
+  return path
+
+
 def get_FQDN_hostname():
     import socket
     return socket.gethostname()

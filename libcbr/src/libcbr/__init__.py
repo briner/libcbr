@@ -18,3 +18,4 @@ import zone
 import zfs
 import daemon
 import path
+import tail

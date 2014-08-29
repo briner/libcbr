@@ -60,20 +60,38 @@ class Daemon:
         file(self.pidfile,'w+').write("%s\n" % pid)
     def delpid(self):
         os.remove(self.pidfile)
+    def get_pid(self):
+        """
+        return the pid of the process or 0 if not running
+        """
+        try:
+          pf = file(self.pidfile,'r')
+          pid = int(pf.read().strip())
+          pf.close()
+        except IOError:
+            pid = None
+        if pid:
+          return pid
+        else:
+          return 0
+    def status(self):
+        """
+        give the status of the daemon
+        """
+        pid= self.get_pid()
+        if pid:
+          print "running with pid(%s)" % pid
+        else:
+          print "stopped"
     def start(self):
         """
         Start the daemon
         """
         # Check for a pidfile to see if the daemon already runs
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+        pid=self.get_pid()       
         if pid:
-            message = "pidfile %s already exist. Daemon already running?\n"
-            sys.stderr.write(message % self.pidfile)
+            message = "pidfile %s already exist. Daemon already running with pid(%s)?\n"
+            sys.stderr.write(message % (self.pidfile, pid))
             sys.exit(1)
         # Start the daemon
         self.daemonize()
@@ -83,12 +101,7 @@ class Daemon:
         Stop the daemon
         """
         # Get the pid from the pidfile
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+        pid=self.get_pid()
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n"
             sys.stderr.write(message % self.pidfile)
