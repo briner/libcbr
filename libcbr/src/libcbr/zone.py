@@ -15,7 +15,6 @@ import unittest
 import mix
 import log
 import notification
-import config
 import zfs as module_zfs
 import path as mod_path
 
@@ -57,7 +56,13 @@ class ZoneErrorNotRunning(ZoneError):
     pass
         
 class Zone(object):
-    def __init__(self,  str_zone_list_entry):
+    def __init__(self,  str_zone_list_entry_OR_zone_list_entry):
+        if isinstance(str_zone_list_entry_OR_zone_list_entry, basestring):
+            zone_list_entry=str_zone_list_entry_OR_zone_list_entry.split(':')
+        else:
+            zone_list_entry=str_zone_list_entry_OR_zone_list_entry
+        if len(zone_list_entry) == 7:
+            zone_list_entry=zone_list_entry+['','']
         [self.zoneid \
         ,self.zonename \
         ,self.state \
@@ -66,12 +71,22 @@ class Zone(object):
         ,self.brand \
         ,self.ip_type
         ,self.r_or_w
-        ,self.file_mac_profile]=str_zone_list_entry.split(':')
+        ,self.file_mac_profile]=zone_list_entry[:9]
         self.is_local=self.zonename != 'global' 
         self._lrecipient=None   # this is a lazy list
         self._lfs_info=None # this is a lazy list
 #        self._dsm_sys=None
         self._lfs=None
+    def to_list(self):
+        return [self.zoneid \
+        ,self.zonename \
+        ,self.state \
+        ,self.zonepath \
+        ,self.uuid \
+        ,self.brand \
+        ,self.ip_type
+        ,self.r_or_w
+        ,self.file_mac_profile]
     def _get_rootpath(self):
         if self.zonename=='global':
             return self.zonepath

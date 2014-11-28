@@ -19,10 +19,41 @@ DF_CMD='/usr/bin/df "%s"'
 DEBUG=False
 my_logger=logging.getLogger('MyLogger')
 
+
+
+def ezcmd(cmd_str):
+    my_logger.debug('execute cmd(%s):' % cmd_str)
+    proc=subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd='/')
+    lstdout=proc.stdout.readlines()
+    lstderr=proc.stderr.readlines()
+    proc.communicate()
+    retcode=proc.wait()
+    return (retcode, lstdout, lstderr)
+
+
 def full_readlink(path):
-  if os.path.islink(path):
-    return full_readlink(os.readlink(path))
-  return path
+    if os.path.islink(path):
+        return full_readlink(os.readlink(path))
+    return path
+
+def get_french_date(date=None):
+    ''' usage: getFrenchDate(date=today)
+               type of date : datetime.date
+               if date=None, then date=today
+    '''
+    import datetime
+    if date == None:
+        date=datetime.date.today()
+    lmonth=[u'janvier', u'février', u'mars', u'avril', u'mai', u'juin', u'juillet', u'août', u'septembre', u'octobre', u'novembre', u'décembre']
+    return unicode(date.day)+u' '+lmonth[date.month-1]+u' '+unicode(date.year)
+
+def get_french_datetime(mydatetime=None):
+    import datetime
+    if mydatetime == None:
+        mydatetime=datetime.datetime.now()
+    ret=u'le %s à %s' % (get_french_date(mydatetime.date())
+                        ,mydatetime.strftime('%Hh%M'))
+    return ret
 
 
 def get_FQDN_hostname():
@@ -332,53 +363,42 @@ path_info=_inst_path_info.path_info
 def get_size_of_list(l):
     return map(lambda x:len(x), l)
 
-def ll_2_nicelist(ll):
+def get_size_of_list_of_list(ll, lsize=[]):
+    if list != type(ll):
+        return 'this listlist is not a list'
+    if len(ll)==0:
+        return lsize
+    if not lsize:
+        lsize=get_size_of_list(ll[0])
+    for l in ll:
+        if list != type(l):
+            return 'this list in not constitued of list'
+        if len (l) != len (lsize):
+            return 'error all the list should be the same lenght'
+        ltmpsize=get_size_of_list(l)
+        for i in range(len(lsize)):
+            if lsize[i] < ltmpsize[i]:
+                lsize[i] = ltmpsize[i]
+    return lsize
+
+
+def list_of_list_2_nice_list(ll, lsize=[]):
+    lret=[]
+    if not lsize:
+        lsize=get_size_of_list_of_list(ll)
     if list != type(ll):
         return 'this is not a list'
-    if len(ll)==0:
-        return ''
-    for i in range(len(ll)):
-        if list != type(ll[i]):
-            return 'this list in not constitued of list'
-        if 0 == i:
-            refSizeList=get_size_of_list(ll[i])
-            refLenList=len(ll[i])
-        else:
-            if refLenList != len(ll[i]):
-                return 'error all the list should be the same lenght'
-            sizeList=get_size_of_list(ll[i])
-            for j in range(refLenList):
-                if refSizeList[j]< sizeList[j]:
-                    refSizeList[j] = sizeList[j]
-    outputFormatLine=u' '.join( map(lambda x:"%-"+unicode(x)+'s', refSizeList) )
-    lret=[outputFormatLine % tuple(l) for l in ll]
+    outputFormatLine=u' '.join( map(lambda x:"%-"+unicode(x)+'s', lsize) )
+    #
+    for l in ll:
+        lret.append(outputFormatLine % tuple(l))
     return lret
+    
+ll_2_nicelist=list_of_list_2_nice_list
 
-def ll_2_nicestr(ll):
-    l=ll_2_nicelist(ll)
-    return '\n'.join(l)
-
-#def ll_2_nicestr(ll):
-#    if list != type(ll):
-#        return 'this is not a list'
-#    if len(ll)==0:
-#        return ''
-#    for i in range(len(ll)):
-#        if list != type(ll[i]):
-#            return 'this list in not constitued of list'
-#        if 0 == i:
-#            refSizeList=get_size_of_list(ll[i])
-#            refLenList=len(ll[i])
-#        else:
-#            if refLenList != len(ll[i]):
-#                return 'error all the list should be the same lenght'
-#            sizeList=get_size_of_list(ll[i])
-#            for j in range(refLenList):
-#                if refSizeList[j]< sizeList[j]:
-#                    refSizeList[j] = sizeList[j]
-#    outputFormatLine=u' '.join( map(lambda x:"%-"+unicode(x)+'s', refSizeList) )
-#    output='\n'.join( outputFormatLine % tuple(l) for l in ll)
-#    return output
+def list_of_list_2_nice_str(ll, lsize=[]):
+    return os.linesep.join(list_of_list_2_nice_list(ll, lsize))
+ll_2_nicestr=list_of_list_2_nice_str
 
 def ld_2_nicestr(ldentry,lkey=None):
     if 0== len(ldentry):
