@@ -56,13 +56,14 @@ class ZoneErrorNotRunning(ZoneError):
     pass
         
 class Zone(object):
+    _LEN_OF_ZONE_LIST_ENTRY=10
     def __init__(self,  str_zone_list_entry_OR_zone_list_entry):
         if isinstance(str_zone_list_entry_OR_zone_list_entry, basestring):
             zone_list_entry=str_zone_list_entry_OR_zone_list_entry.split(':')
         else:
             zone_list_entry=str_zone_list_entry_OR_zone_list_entry
-        if len(zone_list_entry) == 7:
-            zone_list_entry=zone_list_entry+['','']
+        # complement the list to 10 elements
+        zone_list_entry=zone_list_entry+(self._LEN_OF_ZONE_LIST_ENTRY-len(zone_list_entry))*['']
         [self.zoneid \
         ,self.zonename \
         ,self.state \
@@ -71,7 +72,8 @@ class Zone(object):
         ,self.brand \
         ,self.ip_type
         ,self.r_or_w
-        ,self.file_mac_profile]=zone_list_entry[:9]
+        ,self.file_mac_profile
+        ,self.we_do_not_know_what_is_this_field]=zone_list_entry[:]
         self.is_local=self.zonename != 'global' 
         self._lrecipient=None   # this is a lazy list
         self._lfs_info=None # this is a lazy list
