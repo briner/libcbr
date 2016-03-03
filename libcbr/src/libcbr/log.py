@@ -2,7 +2,6 @@
 
 import sys
 import logging.handlers
-import traceback
 
 #
 # This stuff allow to extract the output of the log as it is.
