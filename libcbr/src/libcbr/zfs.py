@@ -23,7 +23,7 @@ import path
 LOCK_MAX_WAIT=300  # seconds = 5 min
 LOCK_TIMEOUT=86400 # seconds = 24 hours
 
-ZFS_SNAPSHOT_CMD="zfs snapshot %(isrecursive)s %(property_value)s %(zfsname_at_snapname)s" 
+ZFS_SNAPSHOT_CMD="zfs snapshot %(isrecursive)s %(property_value)s %(zfsname_at_snapname)s"
 #ZFSALLSNAP_CMD="/usr/local/bin/zfsallsnap snapshot -b -i -c %(zpoolname)s@%(snapname)s"
 #ZFSREMOVEALLSNAP_CMD="/usr/local/bin/zfsallsnap destroy %(zpoolname)s@%(snapname)s"
 ZFSDESTROY_CMD="zfs destroy %s"
@@ -82,7 +82,7 @@ class ZfsErrorIncoherent(ZfsError):
     def __str__(self):
         return repr(self.msg)
     def notify_it(self):
-        my_logger.error('the cmd (%s) in function(%s) did not succeed' % 
+        my_logger.error('the cmd (%s) in function(%s) did not succeed' %
                         (self.function_name, self.inst_cmd) )
         for stdout_or_stdin, msg in self.lstdouterr:
             my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
@@ -103,7 +103,7 @@ class ZfsCmdError(ZfsError):
             lret.append(' - %s : %s' % (stdouterr, msg))
         return os.linesep.join(lret)
     def notify_it(self):
-        my_logger.error('the cmd (%s) in function(%s) did not succeed' % 
+        my_logger.error('the cmd (%s) in function(%s) did not succeed' %
                         (self.function_name, self.inst_cmd) )
         for stdout_or_stdin, msg in self.lstdouterr:
             my_logger.error(" - %s : %s" % (stdout_or_stdin, msg))
@@ -132,7 +132,7 @@ def set_prop_value(prop, value, zfsname):
         raise error
     my_logger.debug('ended set_zfs_prop_value')
 
-    
+
 def destroy(name):
     my_logger.debug('started zfs destroy')
     inst_cmd=ZFSDESTROY_CMD % name
@@ -157,7 +157,7 @@ def clone_zfs(snapshotname, new_zfsname, doption={}):
     my_logger.info('started zfs clone_zfs')
     zfs=get_lzfs().by_name(snapshotname.split("@")[0])
     fun_unlock=stackfunction.stack_function.add(
-        zfs.zpool.unlock_it,                                                      
+        zfs.zpool.unlock_it,
         title="unlock file'semaphore of zpool(%s)" % zfs.zpool.name)
     zfs.zpool.lock_it()
     #
@@ -215,8 +215,9 @@ class Zpool(object):
                 self._lzfs.append(zfs)
         return self._lzfs[:]
     def lock_it(self):
+        my_logger.debug('started lock_zpool zpool(%s)' % self.name)
         zpool_lockname="/var/run/unige_zfs_%s.lock" % self.name
-        my_logger.debug('started lock_zpool zpool(%s) with file(%s)' % (self.name, zpool_lockname))
+        my_logger.info('taking lock for zpool (%s) with file(%s)' % (self.name, zpool_lockname))
         if self.__class__.zpoolname_locked:
             if self.name==self.__class__.zpoolname_locked:
                 my_logger.warning('"lock_zpool" zpool(%s): was already done' % self.name)
@@ -231,7 +232,7 @@ class Zpool(object):
         if retcode != 0:
             my_logger.error('the cmd (%s) did not succeed' % inst_cmd)
             raise ZfsUnableToLockZpool(self.name)
-        my_logger.info("lock(%s) taken for a zpool. We are in a alone" % zpool_lockname)
+        my_logger.info("lock taken for zpool(%s). We are in a alone" % zpool_lockname)
         self.__class__.zpoolname_locked=self.name
         my_logger.debug('ended lock_zpool zpool(%s): done' % self.name)
     def unlock_it(self):
@@ -284,7 +285,7 @@ class Zfs(object):
         return ret
     @origin.setter
     def origin(self,value):
-        self._origin=None if value == '-' else value 
+        self._origin=None if value == '-' else value
     @property
     def uniq_value(self):
         """to comply with UniqList """
@@ -331,7 +332,7 @@ class Zfs(object):
         retcode=proc.wait()
         if retcode != 0:
             my_logger.error('the cmd (%s) did not succeed' % inst_cmd)
-            raise Exception( 'zfsallsnap problem')      
+            raise Exception( 'zfsallsnap problem')
 
 class Snapshot(object):
     def __init__(self, lvalue):
@@ -340,7 +341,7 @@ class Snapshot(object):
         self.duser_prop_value={}
         for prop, value in zip(ZFS_LIST_CMD_LPROP_VALUE, lvalue):
             if prop.find(':') != -1 :
-                self.duser_prop_value[prop]=value          
+                self.duser_prop_value[prop]=value
             else:
                 value=value if value != '-' else None
                 prop="_"+prop if prop in ['name'] else prop
@@ -439,7 +440,7 @@ def refresh_lzfs():
     _do_populate_lzfs=True
 
 def get_lsnapshot():
-    #        
+    #
     if _do_populate_lzfs==True:
         populate_lzfs()
     lret=SnapshotList(_lsnapshot[:])
@@ -519,7 +520,7 @@ def populate_lzpool():
     if retcode != 0 :
         my_logger.error('the cmd (%s) did not succeed' % cmd)
     for out in lout:
-        zpool=Zpool(out.rstrip() ) 
+        zpool=Zpool(out.rstrip() )
         _lzpool.append( zpool )
     _do_populate_lzpool=False
 
