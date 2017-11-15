@@ -266,9 +266,9 @@ class Zfs(object):
         return True
     def is_under_path(self, under_path):
         if self.get_is_mounted():
-            under_path=os.path.normpath(under_path)
-            mountpoint=os.path.normpath(self.mountpoint)
-            if under_path==os.path.commonprefix([under_path,mountpoint]):
+            under_path=os.path.normpath(under_path)+"/"
+            mountpoint=os.path.normpath(self.mountpoint)+"/"
+            if 0 == mountpoint.find(under_path):
                 return True
         return False
     @property
