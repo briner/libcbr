@@ -269,7 +269,7 @@ class Zfs(object):
             under_path=os.path.normpath(under_path)
             mountpoint=os.path.normpath(self.mountpoint)
             under_path=under_path+"/" if under_path[-1] != "/" else under_path
-            mountpoint=os.path.normpath(self.mountpoint)+"/"
+            mountpoint=mountpoint+"/" if mountpoint[-1] != "/" else mountpoint
             if 0 == mountpoint.find(under_path):
                 return True
         return False
